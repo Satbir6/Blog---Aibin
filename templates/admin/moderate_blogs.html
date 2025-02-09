@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Moderate Blogs - BlogSite{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-10">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Blog Moderation</h1>
+        <div class="mt-4 flex space-x-4">
+            <a href="{{ url_for('moderate_blogs', status='pending') }}" 
+               class="px-4 py-2 rounded-lg {% if current_status == 'pending' %}bg-indigo-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">
+                Pending
+            </a>
+            <a href="{{ url_for('moderate_blogs', status='approved') }}"
+               class="px-4 py-2 rounded-lg {% if current_status == 'approved' %}bg-indigo-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">
+                Approved
+            </a>
+            <a href="{{ url_for('moderate_blogs', status='rejected') }}"
+               class="px-4 py-2 rounded-lg {% if current_status == 'rejected' %}bg-indigo-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">
+                Rejected
+            </a>
+        </div>
+    </div>
+
+    <!-- Blog List -->
+    <div class="space-y-6">
+        {% for blog in blogs %}
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">{{ blog.title }}</h3>
+                        <div class="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                            <span>By {{ blog.author.name }}</span>
+                            <span>{{ blog.created_at.strftime('%B %d, %Y') }}</span>
+                            <span class="px-2 py-1 rounded-full text-xs font-medium 
+                                {% if blog.status == 'published' %}bg-green-100 text-green-800
+                                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {{ blog.status|title }}
+                            </span>
+                        </div>
+                    </div>
+                    {% if current_status == 'pending' %}
+                    <div class="flex space-x-2">
+                        <button onclick="moderateBlog({{ blog.id }}, 'approve')" 
+                                class="btn btn-primary">
+                            Approve
+                        </button>
+                        <button onclick="moderateBlog({{ blog.id }}, 'reject')"
+                                class="btn btn-danger">
+                            Reject
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="mt-4 prose max-w-none">
+                    {{ blog.content|safe|truncate(300) }}
+                </div>
+                {% if blog.moderation_comment %}
+                <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-medium text-gray-900">Moderation Comment:</h4>
+                    <p class="mt-1 text-gray-600">{{ blog.moderation_comment }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-12 bg-white rounded-lg shadow">
+            <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No blogs to moderate</h3>
+            <p class="mt-1 text-sm text-gray-500">There are no blogs with {{ current_status }} status.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Moderation Modal -->
+<div id="moderationModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-lg w-full">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Moderation Comment</h3>
+        <textarea id="moderationComment" rows="4" 
+                  class="form-input mb-4"
+                  placeholder="Add a comment about your decision (optional)"></textarea>
+        <div class="flex justify-end space-x-3">
+            <button onclick="closeModal()" 
+                    class="btn btn-secondary">
+                Cancel
+            </button>
+            <button onclick="submitModeration()" 
+                    class="btn btn-primary">
+                Submit
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentBlogId = null;
+let currentAction = null;
+
+function moderateBlog(blogId, action) {
+    currentBlogId = blogId;
+    currentAction = action;
+    document.getElementById('moderationModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('moderationModal').classList.add('hidden');
+    document.getElementById('moderationComment').value = '';
+    currentBlogId = null;
+    currentAction = null;
+}
+
+function submitModeration() {
+    const comment = document.getElementById('moderationComment').value;
+    
+    fetch(`/admin/moderate/${currentBlogId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            action: currentAction,
+            comment: comment
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+</script>
+{% endblock %} 

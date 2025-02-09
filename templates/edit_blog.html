@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Blog - BlogSite{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto my-10 px-4">
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gray-50 border-b px-6 py-4">
+            <h2 class="text-2xl font-bold text-gray-800">Edit Blog Post</h2>
+            <p class="text-gray-600 mt-1">Make changes to your blog post</p>
+        </div>
+
+        <form method="POST" class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Main Content Area -->
+                <div class="md:col-span-2 space-y-6">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="title">
+                            Title
+                        </label>
+                        <input class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                               id="title" name="title" type="text" required
+                               value="{{ blog.title }}">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="content">
+                            Content
+                        </label>
+                        <div class="border rounded-lg">
+                            <textarea id="editor" name="content">{{ blog.content|safe }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="space-y-6 mt-6 md:mt-0">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-800 mb-4">Publishing Options</h3>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2" for="category">
+                                Category
+                            </label>
+                            <select class="shadow-sm border rounded-lg w-full py-2.5 px-4 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    id="category" name="category" required>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}" {{ 'selected' if category.id == blog.category_id else '' }}>
+                                        {{ category.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2" for="status">
+                                Status
+                            </label>
+                            <select class="shadow-sm border rounded-lg w-full py-2.5 px-4 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    id="status" name="status">
+                                <option value="draft" {{ 'selected' if blog.status == 'draft' else '' }}>Save as Draft</option>
+                                <option value="published" {{ 'selected' if blog.status == 'published' else '' }}>Publish Now</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center justify-end mt-6 space-x-3">
+                            <a href="{{ url_for('view_blog', blog_id=blog.id) }}" 
+                               class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                                Cancel
+                            </a>
+                            <button type="submit" 
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                Update Post
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Section -->
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-800 mb-2">Post Information</h4>
+                        <ul class="text-sm text-blue-700 space-y-2">
+                            <li>Created: {{ blog.created_at.strftime('%B %d, %Y') }}</li>
+                            <li>Last Updated: {{ blog.updated_at.strftime('%B %d, %Y') }}</li>
+                            <li>Author: {{ blog.author.name }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Initialize CKEditor -->
+<script>
+    ClassicEditor
+        .create(document.querySelector('#editor'), {
+            toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|', 'outdent', 'indent', '|', 'blockQuote', 'insertTable', 'undo', 'redo'],
+            placeholder: 'Write your blog post here...'
+        })
+        .catch(error => {
+            console.error(error);
+        });
+</script>
+{% endblock %} 
