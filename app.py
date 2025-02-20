@@ -14,7 +14,6 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 # Third-party imports
-import bleach
 from flask import (
     Flask, 
     render_template, 
@@ -24,7 +23,6 @@ from flask import (
     flash, 
     jsonify
 )
-from flask_wtf.csrf import CSRFProtect
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager, 
@@ -44,7 +42,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['POSTS_PER_PAGE'] = 9
 
 # Initialize extensions
-csrf = CSRFProtect(app)
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
