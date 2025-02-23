@@ -21,7 +21,8 @@ from flask import (
     redirect, 
     url_for, 
     flash, 
-    jsonify
+    jsonify, 
+    abort
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -34,12 +35,32 @@ from flask_login import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, case
+import bleach
 
 # === App Configuration ===
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # Change this in production
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['POSTS_PER_PAGE'] = 9
+
+# === Error Handlers ===
+@app.errorhandler(404)
+def page_not_found(e):
+    """Handle 404 Not Found errors."""
+    return render_template('error.html',
+                        user=current_user,
+                         error_code='404',
+                         error_message='Page Not Found',
+                         error_description='The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    """Handle 500 Internal Server Error."""
+    return render_template('error.html',
+                        user=current_user,
+                         error_code='500',
+                         error_message='Internal Server Error',
+                         error_description='Something went wrong on our end. Please try again later.'), 500
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -221,7 +242,7 @@ def login():
         
         flash('Invalid email or password', 'error')
     
-    return render_template('login.html')
+    return render_template('login.html',user=current_user)
 
 @app.route('/logout')
 @login_required
@@ -235,18 +256,22 @@ def logout():
 def home():
     """Render homepage with recent and featured content."""
     # Get recent published blogs
-    recent_blogs = Blog.query.filter_by(status='published')\
-        .order_by(Blog.created_at.desc())\
-        .limit(6).all()
+    recent_blogs = Blog.query.filter(
+        Blog.status == 'published',
+        Blog.moderation_status != 'rejected'
+    ).order_by(Blog.created_at.desc())\
+        .limit(3).all()
     
     # Get all categories with their blog counts
     categories = Category.query.all()
     for category in categories:
-        category.blog_count = len([b for b in category.blogs if b.status == 'published'])
+        category.blog_count = len([b for b in category.blogs if b.status == 'published' and b.moderation_status != 'rejected'])
     
     # Get featured blogs (most liked)
-    featured_blogs = Blog.query.filter_by(status='published')\
-        .join(Like)\
+    featured_blogs = Blog.query.filter(
+        Blog.status == 'published',
+        Blog.moderation_status != 'rejected'
+    ).join(Like)\
         .group_by(Blog.id)\
         .order_by(db.func.count(Like.id).desc())\
         .limit(3).all()
@@ -254,7 +279,8 @@ def home():
     return render_template('index.html',
                          recent_blogs=recent_blogs,
                          categories=categories,
-                         featured_blogs=featured_blogs)
+                         featured_blogs=featured_blogs,
+                         user=current_user)
 
 @app.route('/blogs')
 def all_blogs():
@@ -264,7 +290,7 @@ def all_blogs():
     sort = request.args.get('sort', 'recent')  # 'recent', 'popular'
     
     # Base query
-    query = Blog.query.filter_by(status='published')
+    query = Blog.query.filter(Blog.status == 'published', Blog.moderation_status != 'rejected')
     
     # Apply filters
     if category_id:
@@ -293,7 +319,8 @@ def all_blogs():
                          current_page=page,
                          total_pages=total_pages,
                          current_category=category_id,
-                         current_sort=sort)
+                         current_sort=sort,
+                         user=current_user)
 
 @app.route('/blog/<int:blog_id>', methods=['GET', 'POST'])
 def view_blog(blog_id):
@@ -303,6 +330,11 @@ def view_blog(blog_id):
     POST: Add a new comment (authenticated users only)
     """
     blog = Blog.query.get_or_404(blog_id)
+    # Prevent access to rejected blogs for non-admin users
+    if (blog.status == 'rejected' or blog.moderation_status == 'rejected') and \
+       (not current_user.is_authenticated or not current_user.is_admin):
+        abort(404)
+    
     has_liked = False
     if current_user.is_authenticated:
         has_liked = any(like.user_id == current_user.id for like in blog.likes)
@@ -334,7 +366,8 @@ def view_blog(blog_id):
                          blog=blog, 
                          comments=comments, 
                          related_blogs=related_blogs,
-                         has_liked=has_liked)
+                         has_liked=has_liked,
+                         user=current_user)
 
 @app.route('/category/<int:category_id>')
 def category_view(category_id):
@@ -355,7 +388,8 @@ def category_view(category_id):
                          category=category,
                          blogs=blogs,
                          current_page=page,
-                         total_pages=total_pages)
+                         total_pages=total_pages,
+                         user=current_user)
 
 @app.route('/search')
 def search():
@@ -374,7 +408,8 @@ def search():
             Blog.title.ilike(f'%{query}%'),
             Blog.content.ilike(f'%{query}%')
         ),
-        Blog.status == 'published'
+        Blog.status == 'published',
+        Blog.moderation_status!='rejected'
     )
     
     # Apply filters and sorting
@@ -416,7 +451,8 @@ def search():
                          total_results=total_results,
                          showing_from=showing_from,
                          showing_to=showing_to,
-                         highlight_text=highlight_text)
+                         highlight_text=highlight_text,
+                         user=current_user)
 
 # === User Routes ===
 @app.route('/profile')
@@ -432,7 +468,8 @@ def profile():
                          user=current_user,
                          blogs=user_blogs,
                          published_count=published_count,
-                         draft_count=draft_count)
+                         draft_count=draft_count,
+                         )
 
 @app.route('/my-blogs')
 @login_required
@@ -467,7 +504,8 @@ def my_blogs():
     return render_template('my_blogs.html', 
                          blogs=blogs,
                          current_status=status_filter,
-                         current_sort=sort_by)
+                         current_sort=sort_by,
+                         user=current_user)
 
 @app.route('/create-blog', methods=['GET', 'POST'])
 @login_required
@@ -503,7 +541,8 @@ def create_blog():
         
         return redirect(url_for('view_blog', blog_id=blog.id))
     
-    return render_template('create_blog.html', categories=categories)
+    return render_template('create_blog.html', categories=categories,
+    user=current_user)
 
 @app.route('/edit-blog/<int:blog_id>', methods=['GET', 'POST'])
 @login_required
@@ -531,7 +570,7 @@ def edit_blog(blog_id):
         db.session.commit()
         return redirect(url_for('view_blog', blog_id=blog.id))
     
-    return render_template('edit_blog.html', blog=blog, categories=categories)
+    return render_template('edit_blog.html', blog=blog, categories=categories, user=current_user)
 
 @app.route('/delete-blog/<int:blog_id>', methods=['POST'])
 @login_required
@@ -670,7 +709,8 @@ def admin_dashboard():
     return render_template('admin_dashboard.html',
                          stats=stats,
                          latest_users=latest_users,
-                         recent_activity=recent_activity)
+                         recent_activity=recent_activity,
+                         user=current_user)
 
 @app.route('/admin/moderate')
 @login_required
@@ -684,7 +724,8 @@ def moderate_blogs():
     blogs = Blog.query.filter_by(moderation_status=status)\
         .order_by(Blog.created_at.desc()).all()
     
-    return render_template('admin/moderate_blogs.html', blogs=blogs, current_status=status)
+    return render_template('admin/moderate_blogs.html', blogs=blogs, current_status=status,
+    user=current_user)
 
 @app.route('/admin/moderate/<int:blog_id>', methods=['POST'])
 @login_required
@@ -724,7 +765,7 @@ def moderate_blog(blog_id):
 def list_categories():
     """Display all blog categories."""
     categories = Category.query.order_by(Category.name).all()
-    return render_template('categories.html', categories=categories)
+    return render_template('categories.html', categories=categories, user=current_user)
 
 @app.route('/categories/new', methods=['GET', 'POST'])
 @login_required
@@ -753,7 +794,7 @@ def create_category():
         flash('Category created successfully!', 'success')
         return redirect(url_for('list_categories'))
     
-    return render_template('create_category.html')
+    return render_template('create_category.html', user=current_user)
 
 @app.route('/categories/<int:category_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -785,7 +826,7 @@ def edit_category(category_id):
         flash('Category updated successfully!', 'success')
         return redirect(url_for('list_categories'))
     
-    return render_template('edit_category.html', category=category)
+    return render_template('edit_category.html', category=category, user=current_user)
 
 @app.route('/categories/<int:category_id>/delete', methods=['POST'])
 @login_required
@@ -807,6 +848,43 @@ def delete_category(category_id):
     return redirect(url_for('list_categories'))
 
 # === API Routes ===
+def highlight_text(text, query):
+    """Highlight search query matches in text with HTML spans."""
+    if not query or not text:
+        return text
+    
+    # Convert both text and query to lowercase for case-insensitive matching
+    text_lower = text.lower()
+    query_lower = query.lower()
+    
+    # If query not found in text, return original text
+    if query_lower not in text_lower:
+        return text
+    
+    result = []
+    last_end = 0
+    
+    # Find all occurrences of query in text
+    while True:
+        start = text_lower.find(query_lower, last_end)
+        if start == -1:
+            break
+            
+        end = start + len(query)
+        
+        # Add text before match
+        result.append(text[last_end:start])
+        
+        # Add highlighted match
+        result.append(f'<span class="bg-yellow-200">{text[start:end]}</span>')
+        
+        last_end = end
+    
+    # Add remaining text
+    result.append(text[last_end:])
+    
+    return ''.join(result)
+
 @app.route('/api/search-suggestions')
 def search_suggestions():
     """Get search suggestions for autocomplete."""
@@ -819,7 +897,8 @@ def search_suggestions():
     # Get matching blog titles
     blog_results = Blog.query.filter(
         Blog.title.ilike(f'%{query}%'),
-        Blog.status == 'published'
+        Blog.status == 'published',
+        Blog.moderation_status != 'rejected'
     ).limit(5).all()
     
     for blog in blog_results:
@@ -850,4 +929,4 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)

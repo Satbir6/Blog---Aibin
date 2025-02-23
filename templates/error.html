@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center px-4 bg-gradient-to-b from-slate-50 to-slate-100">
+    <div class="max-w-lg w-full text-center transform transition-all duration-1000 animate-fade-in">
+        <!-- Animated SVG Background -->
+        <div class="relative mb-8 animate-pulse">
+            <svg class="mx-auto w-64 h-64 text-indigo-100" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="11" opacity="0.2"/>
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" class="text-indigo-500"/>
+            </svg>
+            <!-- Error Code Overlay -->
+            <h1 class="absolute inset-0 flex items-center justify-center text-8xl md:text-9xl font-bold text-indigo-600 opacity-90 transform hover:scale-105 transition-transform duration-300"></h1>
+        </div>
+        
+        <!-- Error Message with Animation -->
+        <h2 class="text-3xl font-semibold text-gray-900 mb-4 transform transition-all duration-500 hover:text-indigo-600">
+            {{ error_message }}
+        </h2>
+        
+        <!-- Description with Fade-in -->
+        <p class="text-gray-600 mb-8 animate-fade-in" style="animation-delay: 0.2s">
+            {{ error_description }}
+        </p>
+        
+        <!-- Interactive Back to Home Button -->
+        <a href="{{ url_for('home') }}" 
+           class="group inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg animate-fade-in" 
+           style="animation-delay: 0.4s">
+            <svg class="w-5 h-5 mr-2 transform transition-transform duration-300 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+            <span>Back to Homepage</span>
+        </a>
+    </div>
+</div>
+
+{% endblock %}
